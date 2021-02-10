@@ -5,4 +5,5 @@ export interface Incidencia {
     'tipo-incidencia': string;
     'usuario-registro': string;
     'mensaje-usuario'?: string;
+    'ubicacion'?: string;
 }

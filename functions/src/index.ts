@@ -57,7 +57,7 @@ exports.fulfillment = functions.https.onRequest(
     }
 
     function fallbackIntent() {
-      obtieneLaboratorioAlerta(agent.query);
+      agent.add(msgNingunaSolucion);
     }
 
     async function obtenerIncidencia() {
@@ -103,7 +103,7 @@ exports.fulfillment = functions.https.onRequest(
       );
 
       if (!encontrado) {
-        obtieneLaboratorioAlerta(agent.query);
+        obtieneLaboratorioAlerta();
       }
     }
 
@@ -148,8 +148,7 @@ exports.fulfillment = functions.https.onRequest(
       }
     }
 
-    async function obtieneLaboratorioAlerta(mensajeUsuario: any) {
-
+    async function obtieneLaboratorioAlerta(/* mensajeUsuario: any */) {
 
       let parametersContext:any = UtilsArray.getContextFromName(agent, "detecciondeincidencia-followup").parameters || {};
       let incidenciaName = parametersContext['incidencias']; // Impresora, Proyector, etc
@@ -159,13 +158,14 @@ exports.fulfillment = functions.https.onRequest(
         'ticket-number': numTicket,
         "usuario-registro": usuario,
         "tipo-incidencia": incidenciaName || 'SC',
-        estado: 'A'
+        estado: 'A',
+        ubicacion: agent.parameters.aula
       }
-
+      /*
       if (typeof mensajeUsuario == 'string'){
         incidencia['mensaje-usuario'] = mensajeUsuario;
       }
-
+      */
       UtilsBD.registrarIncidencia(incidencia);
       
       agent.add(
@@ -185,7 +185,9 @@ exports.fulfillment = functions.https.onRequest(
     intentMap.set("Deteccion de Incidencia", obtenerIncidencia);
     intentMap.set("Deteccion de Incidencia - opciones", obtieneOpcion);
     intentMap.set("Deteccion de Incidencia - opciones - resuelto", incidenciaResueltaPorAgente);
+    intentMap.set("Default Fallback Intent - pide aula - ayuda en algo más", incidenciaResueltaPorAgente);
     intentMap.set("Deteccion de Incidencia - opciones - no resuelto", obtieneLaboratorioAlerta);
+    intentMap.set("Default Fallback Intent - pide aula", obtieneLaboratorioAlerta);
     agent.handleRequest(
         intentMap).then(() => console.log('handle will succeed'))
     .catch(err  => console.log('error in request'));
