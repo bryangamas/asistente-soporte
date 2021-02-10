@@ -12,14 +12,45 @@ const tipoIncidenciasRef = db.collection('tipo-incidencias');
 //const incidenciasRef = db.collection('incidencias');
 // const incidenciasRef = db.collection('tipo-incidencias');
 
+// Opciones con las qué machar
+const opcNingunaSolucion = 'Ninguna';
+
+// Variables a reemplazar en los mensajes
+//const NUM_TICKET = '[NUM_TICKET]';
+
 // Mensajes 
 const msgSaludo = '¡Hola! Soy tu asistente de soporte técnico. ';
 const msgDetectarIncidencia = '¿En qué puedo ayudarte?';
 const msgMuestraOpcion = 'Por favor, intenta lo siguiente\n';
-const msgMuestraOpciones = 'Por favor, prueba alguna de estas soluciones\n';
-const msgAyudoOpcion = 'Por favor, cuéntame si resolvió tu problema.\n';
-const msgAyudoOpciones = 'Por favor, cuéntame si alguna de las opciones resolvió tu problema.\n';
-const msgNingunaSolucion = 'Ninguna';
+const msgMuestraOpciones = 'Por favor, prueba alguna de estas opciones: \n\n';
+const msgAyudoOpcion = '\nPor favor, cuéntame si resolvió tu problema.\n';
+const msgAyudoOpciones = '\nPor favor, cuéntame si alguna de las opciones resolvió tu problema.\n';
+/*
+const msgEncontramosSolucion = `¡Excelente! Hemos registrado tu incidencia con el ticket [NUM_TICKET], 
+                                la cual ya ha sido RESUELTA. `;
+const msgNingunaSolucion = `Ups, de acuerdo. Por favor confírmame en qué laboratorio o 
+                        salón te encuentras para poder alertar al área y puedan ayudarte.`;
+*/
+async function getNumeroTicketSiguiente(): Promise<number> {
+  const incidenciasSnapshot = await tipoIncidenciasRef.orderBy('ticket-number').limit(1).get();
+  let numTicket = 0;
+  if (!incidenciasSnapshot.empty) {
+    numTicket = incidenciasSnapshot.docs[0].data()['ticket-number'] || 0;
+  }
+  return numTicket + 1;
+}
+
+function getContextFromName(agent: any, name: string): any {
+  let context = {}
+  agent.contexts.forEach(
+    (e: any, i: number) => {
+      if (e.name = name) {
+        context = e;
+      }
+    }
+  );
+  return context;
+}
 
 exports.fulfillment = functions.https.onRequest(
   async (request, response) => {
@@ -45,7 +76,7 @@ exports.fulfillment = functions.https.onRequest(
 
         // agent.add(doc['desc']||"Nancy")
         
-        if (doc.data()['desc'] == agent.parameters.incidencias) {
+        if (agent.parameters.incidencias == doc.data()['desc']) {
           let message = "";
           if (doc.data()['sol']) {
             if (doc.data()['sol'].length == 1) {
@@ -67,7 +98,7 @@ exports.fulfillment = functions.https.onRequest(
                   agent.add(new Suggestion(`Opción ${i + 1}`));
                 }
               )
-              agent.add(new Suggestion(msgNingunaSolucion));
+              agent.add(new Suggestion(opcNingunaSolucion));
               
             }
           }
@@ -123,11 +154,29 @@ exports.fulfillment = functions.https.onRequest(
       }*/
     }
 
+    function obtieneOpcion() {
+      let parametersContext:any = getContextFromName(agent, "detecciondeincidencia-followup").parameters || {};
+      let numTicket: number = 1;
+      
+      getNumeroTicketSiguiente().then(
+        (nt) => numTicket = nt
+      );
+
+      if (agent.parameters.opciones == opcNingunaSolucion) {
+        //agent.add(msgNingunaSolucion);
+        agent.add("Marcaste la opción " + agent.parameters.opciones + " para la incidencia " + parametersContext['incidencias']);
+      } else {
+        // agent.add(msgEncontramosSolucion.replace(NUM_TICKET, String(numTicket)));
+        agent.add("Marcaste la opción " + agent.parameters.opciones + " para la incidencia " + parametersContext['incidencias'] + " y tu ticket es " + String(numTicket));
+      }
+    }
+
     const intentMap = new Map();
 
     //mapa relacionando el nombre del intent con la función del codigo
     intentMap.set("Default Welcome Intent", welcomeIntent);
     intentMap.set("Deteccion de Incidencia", obtenerIncidencia);
+    intentMap.set("Deteccion de Incidencia - opciones", obtieneOpcion);
     agent.handleRequest(
         intentMap).then(() => console.log('handle will succeed'))
     .catch(err  => console.log('error in request'));
