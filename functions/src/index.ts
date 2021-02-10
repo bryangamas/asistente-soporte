@@ -7,62 +7,75 @@ const db = admin.firestore();
 
 process.env.DEBUG = "dialogflow:debug"; // enables lib debugging statements
 
+// Obtiene referencias a la BD
+const tipoIncidenciasRef = db.collection('tipo-incidencias');
+//const incidenciasRef = db.collection('incidencias');
+// const incidenciasRef = db.collection('tipo-incidencias');
+
+// Mensajes 
+const msgSaludo = '¡Hola! Soy tu asistente de soporte técnico. ';
+const msgDetectarIncidencia = '¿En qué puedo ayudarte?';
+const msgMuestraOpcion = 'Por favor, intenta lo siguiente\n';
+const msgMuestraOpciones = 'Por favor, prueba alguna de estas soluciones\n';
+const msgAyudoOpcion = 'Por favor, cuéntame si resolvió tu problema.\n';
+const msgAyudoOpciones = 'Por favor, cuéntame si alguna de las opciones resolvió tu problema.\n';
+const msgNingunaSolucion = 'Ninguna';
+
 exports.fulfillment = functions.https.onRequest(
-  (request, response) => {
+  async (request, response) => {
     const agent = new WebhookClient({ request, response });
-    const tematicas = ["Inteligencia Artificial", "React", "Firebase"];
-    const sugerenciasEventos = ["Pláticas", "Talleres", "Platzi Live"];
-    const ciudades = ["Bogotá", "Ciudad de México"];
-    //const incidencias = firestore;
-    const siguienteLive = {
-      dia: "20 de Abril",
-      hora: "7 PM",
-      tema: "Mejores prácticas para DevOps"
-    };
-    console.log(
-      "Dialogflow Request headers: " + JSON.stringify(request.headers)
-    );
-    console.log("Dialogflow Request body: " + JSON.stringify(request.body));
-
-    function obtenerCiudad() {
-      if (ciudades.includes(agent.parameters.ciudad)) {
-        agent.add(`Genial! Te puedo ayudar a encontrar pláticas y 
-	talleres en tu ciudad o eventos en línea.
-	¿Por cuál te gustaría empezar?`);
-        sugerenciasEventos.map(element => {
-          agent.add(new Suggestion(element));
-          return;
-        });
-      } else {
-        voidMessage();
-      }
-    }
-    function voidMessage() {
-      agent.add(`Oh! aun no hay meetups en tu ciudad pero,
-	siguiente platzi live es el dia ${siguienteLive.dia} a la 
-	${siguienteLive.hora} y el tema es ${siguienteLive.tema}`);
-    }
-    function detallePlatziLive() {
-      agent.add(`El siguiente platzi live es el día ${siguienteLive.dia} a la 
-	${siguienteLive.hora} y el tema es ${siguienteLive.tema}`);
-    }
-
-    function seleccionDeTematica() {
-      agent.add(`Super! A mi también me encantan los retos.
-    Estos son los temas que se
-    van a cubrir proximamente en tu ciudad: ${tematicas.join(",")}.
-    ¿Cuál te interesa mas?`);
-      tematicas.map(element => {
-        agent.add(new Suggestion(element));
-        return;
-      });
-    }
-    function detalleDeTaller() {
-      agent.add(`El sabado 20 de Mayo a las 9 AM
-en las oficinas de WeWork tendremos de React Hooks. ¿Te gustaría asistir? `);
-    }
     
+
+    function welcomeIntent() {
+      agent.add(msgSaludo + msgDetectarIncidencia);
+    }
+
     async function obtenerIncidencia() {
+      const tipoIncidenciasSnapshot = await tipoIncidenciasRef.get();
+      //const incidenciasSnapshot = await incidenciasRef.get();
+      //agent.add("Test");
+      /*
+      incidenciasSnapshot.forEach((doc: any) => {
+        agent.add(doc.id||"Nancy 3")
+        agent.add(doc.data()['estado']||"Nancy 2")
+      });
+      */
+
+      tipoIncidenciasSnapshot.forEach((doc: any) => {
+
+        // agent.add(doc['desc']||"Nancy")
+        
+        if (doc.data()['desc'] == agent.parameters.incidencias) {
+          let message = "";
+          if (doc.data()['sol']) {
+            if (doc.data()['sol'].length == 1) {
+              message += msgMuestraOpcion;
+              message += doc.data()['sol'][0] + '\n';
+              message += msgAyudoOpcion;
+              agent.add(new Suggestion("Sí"));
+              agent.add(new Suggestion("No"));
+            } else {
+              message += msgMuestraOpciones;
+              doc.data()['sol'].forEach(
+                (e:any, i:any) => {
+                  message += `Opción ${i + 1}: ${e} \n`;
+                }
+              )
+              message += msgAyudoOpciones;
+              doc.data()['sol'].forEach(
+                (e:any, i:any) => {
+                  agent.add(new Suggestion(`Opción ${i + 1}`));
+                }
+              )
+              agent.add(new Suggestion(msgNingunaSolucion));
+              
+            }
+          }
+          agent.add(message);
+        }
+      }
+    );
+
 /*
       const citiesRef = db.collection('cities');
       await citiesRef.doc('SF').set({
@@ -85,7 +98,6 @@ en las oficinas de WeWork tendremos de React Hooks. ¿Te gustaría asistir? `);
         name: 'Beijing', state: null, country: 'China',
         capital: true, population: 21500000
       });
-*/
       agent.add("Holi 2");
 
       const cityRef = db.collection('cities').doc('SF');
@@ -97,10 +109,11 @@ en las oficinas de WeWork tendremos de React Hooks. ¿Te gustaría asistir? `);
         agent.add("Document data: " + doccito['name']);  
         console.log('Document data:', doc.data());
       }
+*/
       /*if (ciudades.includes(agent.parameters.ciudad)) {
-        agent.add(`Genial! Te puedo ayudar a encontrar pláticas y 
+        agent.add('Genial! Te puedo ayudar a encontrar pláticas y 
         talleres en tu ciudad o eventos en línea.
-        ¿Por cuál te gustaría empezar?`);
+        ¿Por cuál te gustaría empezar?');
               sugerenciasEventos.map(element => {
                 agent.add(new Suggestion(element));
                 return;
@@ -113,10 +126,7 @@ en las oficinas de WeWork tendremos de React Hooks. ¿Te gustaría asistir? `);
     const intentMap = new Map();
 
     //mapa relacionando el nombre del intent con la función del codigo
-    intentMap.set("Obtener Ciudad", obtenerCiudad);
-    intentMap.set("Live", detallePlatziLive);
-    intentMap.set("Talleres", seleccionDeTematica);
-    intentMap.set("Seleccion de Taller", detalleDeTaller);
+    intentMap.set("Default Welcome Intent", welcomeIntent);
     intentMap.set("Deteccion de Incidencia", obtenerIncidencia);
     agent.handleRequest(
         intentMap).then(() => console.log('handle will succeed'))
@@ -124,3 +134,4 @@ en las oficinas de WeWork tendremos de React Hooks. ¿Te gustaría asistir? `);
 
   }
 );
+
